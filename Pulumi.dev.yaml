@@ -1,0 +1,5 @@
+config:
+  pulumi:autonaming:
+    pattern: ${name}-${stack}
+  aws:region: ap-northeast-2
+  aws:profile: docs-converter

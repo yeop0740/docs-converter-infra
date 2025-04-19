@@ -1,0 +1,10 @@
+name: docs-converter
+description: docs-converter
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-typescript
