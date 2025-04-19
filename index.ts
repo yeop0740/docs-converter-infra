@@ -27,4 +27,16 @@ const contentsStandByQueue = new aws.sqs.Queue(CONTENTS_STAND_BY_QUEUE_NAME, {
     }).apply(policy => policy.json),
 });
 
+const contentsCreatedBucketNotification = new aws.s3.BucketNotification("contents-created-bucket-notification", {
+    bucket: contentsBucket.id,
+    queues: [
+        {
+            id: 'contents-created-event',
+            queueArn: contentsStandByQueue.arn,
+            events: ["s3:ObjectCreated:*"],
+            filterPrefix: "original/",
+        }
+    ],
+});
+
 export const bucketName = contentsBucket.id;
