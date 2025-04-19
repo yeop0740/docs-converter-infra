@@ -1,7 +1,9 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
+import * as dotenv from "dotenv";
 
+dotenv.config();
 
 const CONTENTS_STAND_BY_QUEUE_NAME = process.env.CONTENTS_STAND_BY_QUEUE ?? "";
 const CONTENTS_BUCKET_NAME = process.env.CONTENTS_BUCKET ?? "";
