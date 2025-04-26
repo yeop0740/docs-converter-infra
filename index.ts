@@ -11,6 +11,8 @@ const LAMBDA_BUCKET_NAME = process.env.LAMBDA_BUCKET ?? "";
 const CONTENTS_CONSUMER_LAMBDA_NAME = process.env.CONTENTS_CONSUMER_LAMBDA ?? "";
 const ORIGINAL_BUCKET_PREFIX = process.env.ORIGINAL_BUCKET_PREFIX ?? "";
 const CONVERTED_BUCKET_PREFIX = process.env.CONVERTED_BUCKET_PREFIX ?? "";
+const CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE ?? "";
+const CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLICY_ATTACH_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLICY_ATTACH ?? "";
 
 const contentsBucket = new aws.s3.BucketV2(CONTENTS_BUCKET_NAME);
 
@@ -98,6 +100,30 @@ const contentsCreatedBucketNotification = new aws.s3.BucketNotification("content
             filterPrefix: "original/",
         }
     ],
+});
+
+const codeDeployServiceRole = aws.iam.getPolicyDocument({
+    statements: [{
+        effect: "Allow",
+        principals: [{
+            type: "Service",
+            identifiers: ["codedeploy.amazonaws.com"],
+        }],
+        actions: ["sts:AssumeRole"],
+    }],
+});
+
+const contentsConsumerLambdaCodeDeployRole = new aws.iam.Role(CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_NAME, {
+    assumeRolePolicy: codeDeployServiceRole.then(assumeRole => assumeRole.json),
+});
+
+const codeDeployRoleForLambdaPolicy = aws.iam.getPolicy({
+    name: 'AWSCodeDeployRoleForLambda',
+});
+
+const contentsConsumerLambdaCodeDeployRoleAndCodeDeployRoleForLambdaPolicyAttach = new aws.iam.RolePolicyAttachment(CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLICY_ATTACH_NAME, {
+    role: contentsConsumerLambdaCodeDeployRole.name,
+    policyArn: codeDeployRoleForLambdaPolicy.then(policy => policy.arn),
 });
 
 export const bucketName = contentsBucket.id;
