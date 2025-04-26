@@ -1,41 +1,45 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
-import * as archive from "@pulumi/archive";
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
 const CONTENTS_STAND_BY_QUEUE_NAME = process.env.CONTENTS_STAND_BY_QUEUE ?? "";
 const CONTENTS_BUCKET_NAME = process.env.CONTENTS_BUCKET ?? "";
-const LAMBDA_BUCKET_NAME = process.env.LAMBDA_BUCKET ?? "";
 const CONTENTS_CONSUMER_LAMBDA_NAME = process.env.CONTENTS_CONSUMER_LAMBDA ?? "";
-const ORIGINAL_BUCKET_PREFIX = process.env.ORIGINAL_BUCKET_PREFIX ?? "";
-const CONVERTED_BUCKET_PREFIX = process.env.CONVERTED_BUCKET_PREFIX ?? "";
 const CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE ?? "";
 const CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLICY_ATTACH_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLICY_ATTACH ?? "";
+const CONTENTS_CONSUMER_LAMBDA_REPOSITORY_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_REPOSITORY ?? "";
+const CONTENTS_CONSUMER_LAMBDA_ROLE_ATTACHMENT_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_ROLE_ATTACHMENT ?? "";
+const CONTENTS_CONSUMER_LAMBDA_ROLE_SQS_ATTACHMENT_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_ROLE_SQS_ATTACHMENT ?? "";
 
 const contentsBucket = new aws.s3.BucketV2(CONTENTS_BUCKET_NAME);
 
-const lambdaBucket = new aws.s3.BucketV2(LAMBDA_BUCKET_NAME);
-
-const lambdaBucketVersioning = new aws.s3.BucketVersioningV2(`${LAMBDA_BUCKET_NAME}-versioning`, {
-    bucket: lambdaBucket.id,
-    versioningConfiguration: {
-        status: "Enabled",
+const contentsConsumerLambdaRepository = new aws.ecr.Repository(CONTENTS_CONSUMER_LAMBDA_REPOSITORY_NAME, {
+    imageTagMutability: "MUTABLE",
+    imageScanningConfiguration: {
+        scanOnPush: true,
     },
 });
 
-const mockObjectFile = archive.getFile({
-    type: "zip",
-    sourceFile: "asset/mock-contents-consumer-lambda.py",
-    outputPath: `${CONTENTS_CONSUMER_LAMBDA_NAME}-${pulumi.getStack()}.zip`,
-});
+// const contentsConsumerLambdaRepositoryAuthToken = aws.ecr.getAuthorizationTokenOutput({
+//     registryId: contentsConsumerLambdaRepository.registryId,
+// });
 
-const mockObject = new aws.s3.BucketObject(CONTENTS_CONSUMER_LAMBDA_NAME, {
-    bucket: lambdaBucketVersioning.id,
-    source: new pulumi.asset.FileArchive(`${CONTENTS_CONSUMER_LAMBDA_NAME}-${pulumi.getStack()}.zip`),
-    contentType: "application/zip",
-});
+// const contentsConsumerLambdaImage = new docker.Image(CONTENTS_CONSUMER_LAMBDA_IMAGE_NAME, {
+//     build: {
+//         context: "./",
+//         dockerfile: "asset/Dockerfile",
+//         platform: "linux/arm64",
+//     },
+//     imageName: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
+//     registry: {
+//         password: pulumi.secret(contentsConsumerLambdaRepositoryAuthToken.password),
+//         server: contentsConsumerLambdaRepository.repositoryUrl,
+//         username: contentsConsumerLambdaRepositoryAuthToken.userName,
+//     },
+//     skipPush: true,
+// });
 
 const contentsConsumerLambdaServiceRole = aws.iam.getPolicyDocument({
     statements: [{
@@ -54,21 +58,12 @@ const contentsConsumerLambdaRole = new aws.iam.Role(CONTENTS_CONSUMER_LAMBDA_NAM
 });
 
 const contentsConsumerLambda = new aws.lambda.Function(CONTENTS_CONSUMER_LAMBDA_NAME, {
-    s3Bucket: lambdaBucket.id,
-    s3Key:`${CONTENTS_CONSUMER_LAMBDA_NAME}-${pulumi.getStack()}`,
+    packageType: "Image",
+    imageUri: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
     role: contentsConsumerLambdaRole.arn,
-    handler: "consumer.handle",
     architectures: ["arm64"],
-    runtime: aws.lambda.Runtime.Python3d12,
     memorySize: 1024,
     timeout: 10,
-    publish: true,
-    environment: {
-        variables: {
-            ORIGINAL_BUCKET_NAME: contentsBucket.id.apply(id => `${id}${ORIGINAL_BUCKET_PREFIX}`),
-            CONVERTED_BUCKET_NAME: contentsBucket.id.apply(id => `${id}${CONVERTED_BUCKET_PREFIX}`),
-        }
-    }
 });
 
 const contentsStandByQueue = new aws.sqs.Queue(CONTENTS_STAND_BY_QUEUE_NAME, {
