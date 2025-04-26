@@ -57,6 +57,16 @@ const contentsConsumerLambdaRole = new aws.iam.Role(CONTENTS_CONSUMER_LAMBDA_NAM
     assumeRolePolicy: contentsConsumerLambdaServiceRole.then(assumeRole => assumeRole.json),
 });
 
+const contentsConsumerLambdaRoleAttachment = new aws.iam.RolePolicyAttachment(CONTENTS_CONSUMER_LAMBDA_ROLE_ATTACHMENT_NAME, {
+    role: contentsConsumerLambdaRole,
+    policyArn: aws.iam.ManagedPolicies.AWSLambdaBasicExecutionRole,
+});
+
+const contentsConsumerLambdaRoleSqsAttachment = new aws.iam.RolePolicyAttachment(CONTENTS_CONSUMER_LAMBDA_ROLE_SQS_ATTACHMENT_NAME, {
+    role: contentsConsumerLambdaRole,
+    policyArn: aws.iam.ManagedPolicy.AWSLambdaSQSQueueExecutionRole,
+});
+
 const contentsConsumerLambda = new aws.lambda.Function(CONTENTS_CONSUMER_LAMBDA_NAME, {
     packageType: "Image",
     imageUri: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
@@ -96,6 +106,13 @@ const contentsCreatedBucketNotification = new aws.s3.BucketNotification("content
         }
     ],
 });
+
+const contentsStandByQueueEventSourceMapping = new aws.lambda.EventSourceMapping("contents-stand-by-queue-event-source-mapping", {
+    eventSourceArn: contentsStandByQueue.arn,
+    functionName: contentsConsumerLambda.name,
+    batchSize: 1,
+    enabled: true,
+})
 
 const codeDeployServiceRole = aws.iam.getPolicyDocument({
     statements: [{
