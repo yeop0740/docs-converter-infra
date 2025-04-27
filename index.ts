@@ -111,9 +111,10 @@ const contentsCreatedBucketNotification = new aws.s3.BucketNotification("content
 const contentsStandByQueueEventSourceMapping = new aws.lambda.EventSourceMapping("contents-stand-by-queue-event-source-mapping", {
     eventSourceArn: contentsStandByQueue.arn,
     functionName: contentsConsumerLambda.name,
-    batchSize: 1,
+    batchSize: 10,
     enabled: true,
-})
+    functionResponseTypes: ['ReportBatchItemFailures'],
+});
 
 const codeDeployServiceRole = aws.iam.getPolicyDocument({
     statements: [{
