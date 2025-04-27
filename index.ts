@@ -72,9 +72,9 @@ const contentsConsumerLambda = new aws.lambda.Function(CONTENTS_CONSUMER_LAMBDA_
     packageType: "Image",
     imageUri: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
     role: contentsConsumerLambdaRole.arn,
-    architectures: ["arm64"],
+    architectures: ["x86_64"],
     memorySize: 1024,
-    timeout: 10,
+    timeout: 30,
 }, {dependsOn: [contentsConsumerLambdaImage]});
 
 const contentsStandByQueue = new aws.sqs.Queue(CONTENTS_STAND_BY_QUEUE_NAME, {
