@@ -68,6 +68,11 @@ const contentsConsumerLambdaRoleSqsAttachment = new aws.iam.RolePolicyAttachment
     policyArn: aws.iam.ManagedPolicy.AWSLambdaSQSQueueExecutionRole,
 });
 
+const contentsConsumerLambdaRoleS3Attachment = new aws.iam.RolePolicyAttachment('contents-consumer-lambda-role-s3-access-policy-attach', {
+    role: contentsConsumerLambdaRole,
+    policyArn: aws.iam.ManagedPolicy.AmazonS3FullAccess,
+});
+
 const contentsConsumerLambda = new aws.lambda.Function(CONTENTS_CONSUMER_LAMBDA_NAME, {
     packageType: "Image",
     imageUri: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
