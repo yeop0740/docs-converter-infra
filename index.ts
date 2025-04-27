@@ -1,5 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
+import * as docker from "@pulumi/docker";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -12,6 +13,7 @@ const CONTENTS_CONSUMER_LAMBDA_CODE_DEPLOY_ROLE_CODE_DEPLOY_ROLE_FOR_LAMBDA_POLI
 const CONTENTS_CONSUMER_LAMBDA_REPOSITORY_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_REPOSITORY ?? "";
 const CONTENTS_CONSUMER_LAMBDA_ROLE_ATTACHMENT_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_ROLE_ATTACHMENT ?? "";
 const CONTENTS_CONSUMER_LAMBDA_ROLE_SQS_ATTACHMENT_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_ROLE_SQS_ATTACHMENT ?? "";
+const CONTENTS_CONSUMER_LAMBDA_IMAGE_NAME = process.env.CONTENTS_CONSUMER_LAMBDA_IMAGE ?? "";
 
 const contentsBucket = new aws.s3.BucketV2(CONTENTS_BUCKET_NAME);
 
@@ -22,24 +24,23 @@ const contentsConsumerLambdaRepository = new aws.ecr.Repository(CONTENTS_CONSUME
     },
 });
 
-// const contentsConsumerLambdaRepositoryAuthToken = aws.ecr.getAuthorizationTokenOutput({
-//     registryId: contentsConsumerLambdaRepository.registryId,
-// });
+const contentsConsumerLambdaRepositoryAuthToken = aws.ecr.getAuthorizationTokenOutput({
+    registryId: contentsConsumerLambdaRepository.registryId,
+});
 
-// const contentsConsumerLambdaImage = new docker.Image(CONTENTS_CONSUMER_LAMBDA_IMAGE_NAME, {
-//     build: {
-//         context: "./",
-//         dockerfile: "asset/Dockerfile",
-//         platform: "linux/arm64",
-//     },
-//     imageName: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
-//     registry: {
-//         password: pulumi.secret(contentsConsumerLambdaRepositoryAuthToken.password),
-//         server: contentsConsumerLambdaRepository.repositoryUrl,
-//         username: contentsConsumerLambdaRepositoryAuthToken.userName,
-//     },
-//     skipPush: true,
-// });
+const contentsConsumerLambdaImage = new docker.Image(CONTENTS_CONSUMER_LAMBDA_IMAGE_NAME, {
+    build: {
+        dockerfile: "asset/Dockerfile",
+        platform: "linux/amd64",
+    },
+    imageName: pulumi.interpolate`${contentsConsumerLambdaRepository.repositoryUrl}:latest`,
+    registry: {
+        password: pulumi.secret(contentsConsumerLambdaRepositoryAuthToken.password),
+        server: contentsConsumerLambdaRepository.repositoryUrl,
+        username: contentsConsumerLambdaRepositoryAuthToken.userName,
+    },
+    skipPush: true, // 처음 배포 시 false 로 설정
+});
 
 const contentsConsumerLambdaServiceRole = aws.iam.getPolicyDocument({
     statements: [{
@@ -74,7 +75,7 @@ const contentsConsumerLambda = new aws.lambda.Function(CONTENTS_CONSUMER_LAMBDA_
     architectures: ["arm64"],
     memorySize: 1024,
     timeout: 10,
-});
+}, {dependsOn: [contentsConsumerLambdaImage]});
 
 const contentsStandByQueue = new aws.sqs.Queue(CONTENTS_STAND_BY_QUEUE_NAME, {
     policy: aws.iam.getPolicyDocumentOutput({
